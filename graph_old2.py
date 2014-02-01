@@ -1,4 +1,7 @@
 """
+DON'T USE THIS! THIS IS VERY SLOW IN LOADING DATA! COMPUTER WILL FREEZE!
+USE GRAPH.PY
+
 Graph module for directed graph.
 
 The data is stored as a dict where the keys are tuples of the vertex coordinates
@@ -80,8 +83,7 @@ class Graph:
         """
 
         self._map_data = {}
-        self._id_index = {}
-                
+        
         for v in V:
             self.add_vertex(v)
 
@@ -103,8 +105,11 @@ class Graph:
         >>> g.id_to_coord(6)
         ()
         """
-        if v_id in self._id_index.keys(): return self._id_index[v_id]
-        else: return ()
+        for coord in self._map_data.keys():
+            if len(self._map_data[coord]) == 2:
+                if self._map_data[coord][1] == v_id: return coord # Can directly return without any risk becuase tuple is immutable
+            
+        return ()
         
     def coord_to_id(self, coord):
         """
@@ -133,46 +138,42 @@ class Graph:
         earlier, but this time an ID is not mentioned, the ID will NOT be removed.
         
         Warning: If different vertex coordinates with an already used ID is added, 
-        this ID is assigned to the new vertex. 
-        
+        this ID is assigned to BOTH these vertices. Referring using ID as a handle
+        will produce unpredictable results (See last test case). Thus, make sure 
+        that no ID is repeated. This can be done by checking using .id_to_coord
+        method if in doubt.
+               
+        Note for TA: The above warning could have been easily removed by using an
+        .id_to_coord check in .add_vertex. Since, this warning does not apply to
+        the data provided in this assignment, it has not been done to keep the 
+        time complexity low. The user should manually use .id_to_coord if in doubt.
+            
         Running time: O(1)
         
         >>> g = Graph()
         >>> g.add_vertex((52,-118,1))
+        >>> 1 in g._map_data.keys()
+        False
         >>> (52,-118) in g._map_data.keys()
         True
         >>> g._map_data[(52,-118)]
         [[], 1]
         >>> g.add_vertex((55,-120,1))
-        >>> g._map_data[(55,-120)]
-        [[], 1]
+        >>> len(g._map_data) == 2
+        True
+        >>> g._map_data[(52,-118)] == g._map_data[(55,-120)]
+        True
+        >>> g.add_vertex((52,-118))
         >>> g._map_data[(52,-118)]
-        [[]]
-        >>> g.add_vertex((55,-120,2))
-        >>> g._map_data[(55,-120)]
-        [[], 2]
-        >>> g.id_to_coord(1)
-        ()
+        [[], 1]
         """
         if (v[0], v[1]) not in self._map_data.keys():
             self._map_data[(v[0], v[1])] = [[]]
 
-        if len(v) == 3: # If ID is passed. Either ID needs to be added or update
-            if len(self._map_data[(v[0], v[1])]) == 1: # The vertex did not already have any ID assigned
-                self._map_data[(v[0], v[1])].append(v[2])
+        if len(v) == 3: # If ID is passed
+            if len(self._map_data[(v[0], v[1])]) == 2: self._map_data[(v[0], v[1])][1] = v[2] # Update ID if already exists
+            if len(self._map_data[(v[0], v[1])]) == 1: self._map_data[(v[0], v[1])].append(v[2]) # Add ID if it did not exist
 
-                if v[2] in self._id_index.keys(): # But v[2] is already used by some other coordinates!
-                    temp = self._id_index[v[2]] # The other coordinates
-                    self._map_data[temp] = [self._map_data[temp][0]] # Delete this ID from the other coordinates                    
-                
-                self._id_index[v[2]] = (v[0], v[1]) # Adding the new coordinates to ID index
-                
-            else: # The vertex has an old ID assigned. Needs updating
-                temp = self._map_data[(v[0], v[1])][1] # Old ID
-                self._map_data[(v[0], v[1])][1] = v[2] # Add new ID to coordinate data
-                self._id_index.pop(temp) # Remove old ID from ID index
-                self._id_index[v[2]] = (v[0], v[1]) # Add new ID to ID index
-                                    
     def add_id(self, v, v_id):
         """
         Adds an ID (v_id) to an already existent vertex (v). If the vertex does not  
@@ -292,20 +293,24 @@ class Graph:
 
     def ids(self):
         """
-        Returns a copy of set of all IDs and their in the graph. The
+        Returns a copy of set of all the vertices & their IDs in the graph. The
         returned value only contains those vertices whose IDs existed in graph.
         
         
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
-        >>> g.ids() == {(1, (53.3, -118)), (2, (55, -120)), (3, (52, -119))}
+        >>> g.ids() == {((53.3, -118), 1), ((55, -120), 2), ((52, -119), 3)}
         True
         >>> g.add_vertex((45, -130))
-        >>> g.ids() == {(1, (53.3, -118)), (2, (55, -120)), (3, (52, -119))}
+        >>> g.ids() == {((53.3, -118), 1), ((55, -120), 2), ((52, -119), 3)}
         True
         >>> g.vertices() == {(53.3,-118), (55,-120), (52,-119)}
         False
         """
-        return set(self._id_index.items())
+        
+        rv = set()
+        for coord,data in self._map_data.items():
+            if len(data) == 2: rv.add((coord, data[1]))
+        return rv
 
     def is_vertex(self, v):
         """
@@ -577,7 +582,7 @@ def load_data(filename):
     file_len = 2*(i + 1)
     f.seek(0)
     
-    print("Progress: |" + 99*" " + "|   0 %%", end = "") # Progress bar
+    print("Progress: |" + 100*" " + "|   0 %%", end = "") # Progress bar
     last_per = 0
     
     attempt = 1
@@ -606,7 +611,7 @@ def load_data(filename):
     
     f.close() 
     
-    print("Data loaded. Total successful lines = %d. Number of errored lines = %d" %(((file_len/2)-len(errored_lines)), len(errored_lines)))
+    print("Data loaded. Number of errors = %d" % len(errored_lines))
 
     if len(errored_lines) != 0: 
         print("Errored lines: " + str(errored_lines))

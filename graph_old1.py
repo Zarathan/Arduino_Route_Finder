@@ -1,33 +1,14 @@
 """
+DON'T USE THIS! USE GRAPH.PY! THIS HASHES USING ID
 Graph module for directed graph.
 
-The data is stored as a dict where the keys are tuples of the vertex coordinates
-of the form (latitude, longitude). Tuples are immutable so can be used for hashing.
-Also, the client requests come in the form of (lat, long), so runtime should be better
-than the class graph_old.py which hashes on vertex IDs.
-The value of each key is a list consisting of 1 list and 1 int (optional):
-    => The list contains the coordinates (tuples) of all the neighbours of that vertex.
+The data is stored as a dict where the keys are the IDs of the vertices.
+The value of each key is a list consisting of 1 tuple and 1 list:
+    => The tuple contains the coordinate information: (latitude, longitude).
+       Tuple is being used because updating the coordinates should theoretically
+       be a rare task. Immutable object is thus better.
+    => The list contains the IDs of all the neighbours of that vertex.
        List is being used as neighbours could need updating as the map progresses.
-    => The int is the ID of that vertex as mentioned in the database. This is added
-       only if it was provided. Since a general mapping is done between coordinates,
-       this is not a mandatory piece of information. Even if it is provided,
-       all the data processing is done in terms of coordinates (after processing 
-       the ID). The ID is just stored for future references.
-    
-A compromise between runtime during the program and during data load has to be made.
-If the dict is hashed using IDs, converting CSV to graph is faster as the edges
-are stored as pairs of IDs. But, running client requests will be slower as the client
-provides and demands data in form of coordinates. As seen in graph_old.py, pulling
-IDs from coordinates and then processing it is slower because the dict keys are IDs.
-Instead here, the dict keys are coordinates, so looking up neighbours will be O(1). 
-
-This comes at a cost of data loading runtime, as the program will have to convert
-the links stated as a pair of IDs to a link in coordinate tuples. 
-
-Since, loading is just done once, this tradeoff is preferred.  
-
-SO in nutshell, all the processing and data management is done in terms of coordinates.
-Nevertheless, IDs can be used as handles for these coordinates if they were mentioned.
 """
 
 from collections import deque
@@ -37,51 +18,29 @@ class Graph:
     def __init__(self, V=set(), E=[]):
         """
         Create a graph with a given set of vertices and list of edges.
-        E is a list of tuples of the 2 vertex coordinates of the form ((start lat, start lon), (end lat, end lon)).
+        E is a list of tuples of the 2 vertex IDs of the form (start, end).
         V is set of tuples, where each tuple is of the format
-        (Latitude, Longitude, Vertex ID(optional)) of 1 vertex.
+        (Latitude, Longitude, Vertex ID) of 1 vertex.
         
         If no arguements are passed in, the graph is an empty graph with
         no vertices and edges.
 
-        If IDs of vertices are provided, edges can be stated in the form of tuples of 
-        vertex IDs. Runtime will be slower as reverse lookup in a dict will be used.
-        IDs will also be stored as a ._map_data[(coordinates)][1]
-        If no IDs are stated in vertices, but edges are mentioned as IDs, those edges will be ignored.
-        
-        The two data entry methods are demonstrated as below.
-        
         >>> g = Graph()
         >>> g._map_data == {}
         True
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
-        >>> g._map_data.keys() == set({(53.3,-118), (55,-120), (52,-119)})
+        >>> g._map_data.keys() == set({1,2,3})
         True
-        >>> g._map_data[(53.3,-118)]
-        [[(55, -120)], 1]
-        >>> g._map_data[(52,-119)]
-        [[], 3]
-        >>> g._map_data[(55,-120)]
-        [[(52, -119)], 2]
-        >>> g = Graph({(53.3,-118), (55,-120), (52,-119)}, [((53.3,-118), (55,-120)), ((55,-120), (52,-119))])
-        >>> g._map_data.keys() == set({(53.3,-118), (55,-120), (52,-119)})
-        True
-        >>> g._map_data[(53.3,-118)]
-        [[(55, -120)]]
-        >>> g._map_data[(52,-119)]
-        [[]]
-        >>> g._map_data[(55,-120)]
-        [[(52, -119)]]
-        >>> g.add_edge((1,3))
-        >>> g.is_edge(((53.3,-118), (52,-119)))
-        False
-        >>> g.is_edge((1,3))
-        False
+        >>> g._map_data[1]
+        [(53.3, -118), [2]]
+        >>> g._map_data[3]
+        [(52, -119), []]
+        >>> g._map_data[2]
+        [(55, -120), [3]]
         """
 
         self._map_data = {}
-        self._id_index = {}
-                
+        
         for v in V:
             self.add_vertex(v)
 
@@ -91,11 +50,8 @@ class Graph:
     def id_to_coord(self, v_id):
         """
         Returns a tuple of the form (latitude, longitude) of the given v_id (vertex id).
-        Useful only if the optional data vertex ID was given during graph generation.
         
-        Returns () if no such ID is found. 
-        
-        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-115)}, [(1,2), (2,3)])
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.id_to_coord(1)
         (53.3, -118)
         >>> g.id_to_coord(3)
@@ -103,161 +59,90 @@ class Graph:
         >>> g.id_to_coord(6)
         ()
         """
-        if v_id in self._id_index.keys(): return self._id_index[v_id]
-        else: return ()
+        if v_id not in self._map_data.keys(): return ()
+        else: return self._map_data[v_id][0] # Can directly return without any risk becuase tuple is immutable
         
     def coord_to_id(self, coord):
         """
         Returns the ID of the passed coordinates of a vertex as a tuple: (latitude, longitude)
+        Useful only if you know the precise coordinates as stored in the graph.
         
-        Returns None if no such coordinates are found, or if the coordinates do 
-        not have any ID associated with them.
-        
-        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-115)}, [(1,2), (2,3)])
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.coord_to_id((53.3, -118))
         1
         >>> g.coord_to_id((52, -119))
         3
         >>> g.coord_to_id((89, 82))
-        >>> g.coord_to_id((59,-115))
         """
-        if coord not in self._map_data.keys(): return None
-        elif len(self._map_data[coord]) == 1: return None
-        else: return self._map_data[coord][1] # Can directly return without any risk becuase int is immutable
+        for v_id in self._map_data.keys():
+            if self._map_data[v_id][0] == coord: return v_id
+        
+        return None 
         
     def add_vertex(self, v):
         """
         Adds a vertex to our graph.
-        If a vertex with the same coordinates is given, but this time an ID is 
-        specified, the ID will added to the graph. But if there was an ID 
-        earlier, but this time an ID is not mentioned, the ID will NOT be removed.
-        
-        Warning: If different vertex coordinates with an already used ID is added, 
-        this ID is assigned to the new vertex. 
+        If a vertex with same ID is given, the geo coordinates will be updated.
         
         Running time: O(1)
         
         >>> g = Graph()
         >>> g.add_vertex((52,-118,1))
-        >>> (52,-118) in g._map_data.keys()
+        >>> 1 in g._map_data.keys()
         True
-        >>> g._map_data[(52,-118)]
-        [[], 1]
+        >>> g._map_data[1]
+        [(52, -118), []]
         >>> g.add_vertex((55,-120,1))
-        >>> g._map_data[(55,-120)]
-        [[], 1]
-        >>> g._map_data[(52,-118)]
-        [[]]
-        >>> g.add_vertex((55,-120,2))
-        >>> g._map_data[(55,-120)]
-        [[], 2]
-        >>> g.id_to_coord(1)
-        ()
+        >>> len(g._map_data) == 1
+        True
+        >>> g._map_data[1]
+        [(55, -120), []]
         """
-        if (v[0], v[1]) not in self._map_data.keys():
-            self._map_data[(v[0], v[1])] = [[]]
+        if v[2] not in self._map_data.keys():
+            self._map_data[v[2]] = [(v[0], v[1]), []]
 
-        if len(v) == 3: # If ID is passed. Either ID needs to be added or update
-            if len(self._map_data[(v[0], v[1])]) == 1: # The vertex did not already have any ID assigned
-                self._map_data[(v[0], v[1])].append(v[2])
-
-                if v[2] in self._id_index.keys(): # But v[2] is already used by some other coordinates!
-                    temp = self._id_index[v[2]] # The other coordinates
-                    self._map_data[temp] = [self._map_data[temp][0]] # Delete this ID from the other coordinates                    
-                
-                self._id_index[v[2]] = (v[0], v[1]) # Adding the new coordinates to ID index
-                
-            else: # The vertex has an old ID assigned. Needs updating
-                temp = self._map_data[(v[0], v[1])][1] # Old ID
-                self._map_data[(v[0], v[1])][1] = v[2] # Add new ID to coordinate data
-                self._id_index.pop(temp) # Remove old ID from ID index
-                self._id_index[v[2]] = (v[0], v[1]) # Add new ID to ID index
-                                    
-    def add_id(self, v, v_id):
-        """
-        Adds an ID (v_id) to an already existent vertex (v). If the vertex does not  
-        exist, it will not do anything. If the vertex already has an ID, updates the ID.
-        
-        It calls the .add_vertex method itself. But it ensures that the vertex exists first.
-        Can be useful if you want to add an ID, only if the vertex exists, but are 
-        unsure if the vertex exists.
-        
-        >>> g = Graph()
-        >>> g.add_vertex((52,-118,1))
-        >>> g.add_id((52,-118), 2)
-        >>> g.coord_to_id((52,-118))
-        2
-        >>> g.add_id((55,-115), 1)
-        >>> g.id_to_coord(1)
-        ()
-        >>> g._map_data[(52,-118)]
-        [[], 2]
-        """
-        
-        if v in self._map_data.keys(): self.add_vertex((v[0], v[1], v_id))
+        else: self._map_data[v[2]][0] = (v[0], v[1])
         
     def add_edge(self, e):
         """
-        Adds an edge to our graph. The edge should be of the form: 
-        ((start_lat, start_lon), (end_lat, end_lon)). 
-        If IDs were mentioned for the corresponding start and/or end vertices,
-        this format can be used to (though slower):
-        (v_id_start, (end_lat, end_lon)).
-        
+        Adds an edge to our graph. The edge should be of the form: (v_id1, v_id2),
         where v_id1 and v_id2 should be the IDs of 2 vertices already in graph.
         Can add more than one copy of an edge.
 
+        Running time: O(1)
+
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)})
-        >>> g.id_to_coord(2) in g._map_data[g.id_to_coord(1)][0]
+        >>> 2 in g._map_data[1][1]
         False
         >>> g.add_edge((1,2))
-        >>> g.id_to_coord(2) in g._map_data[g.id_to_coord(1)][0]
+        >>> 2 in g._map_data[1][1]
         True
         >>> g.add_edge((1,2))
-        >>> len(g._map_data[g.id_to_coord(1)][0]) == 2
+        >>> len(g._map_data[1][1]) == 2
         True
         """
-        start = e[0]
-        end = e[1]
-        
-        if type(e[0]) is int:
-            start = self.id_to_coord(e[0])
-        if type(e[1]) is int:
-            end = self.id_to_coord(e[1])      
-        
-        if start in self._map_data.keys() and end in self._map_data.keys():
-            self._map_data[start][0].append(end)
-    
+        if e[0] in self._map_data.keys() and e[1] in self._map_data.keys():
+            self._map_data[e[0]][1].append(e[1])
 
     def neighbours(self,v):
         """
         Given a vertex v, return a copy of the list
         of neighbours of v in the graph.
-        v should be of the form (lat, lon). If the graph contains an ID for that 
-        vertex, v can also be the ID for that vertex (slower).
         
-        Returns None if the vertex is not found (both in coordinate or ID form).
-        (to differentiate from the case where the vertex is actually found 
-        but has no neighbours....[] is returned in that case)
-        
-        Running time: O(len(self._map_data[v]))
-        (linear in the number of neighbours of v)        
-
         >>> g = Graph()
         >>> g.neighbours(1)
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3), (1,3)])
         >>> g.neighbours(1)
-        [(55, -120), (52, -119)]
-        >>> [g.coord_to_id(i) for i in g.neighbours(1)]
         [2, 3]
+
+        Running time: O(len(self._map_data[v]))
+        (linear in the number of neighbours of v)
         """
-        if type(v) is int: 
-            v = self.id_to_coord(v)
-            
+
         if v not in self._map_data.keys():
             return None 
         else:
-            return list(self._map_data[v][0]) 
+            return list(self._map_data[v][1]) 
 
     def vertices(self):
         """
@@ -266,7 +151,7 @@ class Graph:
         Running time: O(# vertices)
 
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
-        >>> g.vertices() == {(53.3,-118), (55,-120), (52,-119)}
+        >>> g.vertices() == {1,2,3}
         True
         """
 
@@ -279,60 +164,55 @@ class Graph:
         Running time: O(# nodes + # edges)
 
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
-        >>> set(g.edges()) == {((53.3, -118), (55, -120)), ((55, -120), (52, -119))}
-        True
+        >>> g.edges()
+        [(1, 2), (2, 3)]
         """
         
-        rv = []
-        for coord,data in self._map_data.items():
-            for u in data[0]:
-                rv.append((coord,u))
+        edges = []
+        for v_id,data in self._map_data.items():
+            for u in data[1]:
+                edges.append((v_id,u))
     
-        return rv
+        return edges
 
-    def ids(self):
+    def coordinates(self):
         """
-        Returns a copy of set of all IDs and their in the graph. The
-        returned value only contains those vertices whose IDs existed in graph.
-        
+        Returns a copy of all the vertices & their coordinates in the graph.
         
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
-        >>> g.ids() == {(1, (53.3, -118)), (2, (55, -120)), (3, (52, -119))}
-        True
-        >>> g.add_vertex((45, -130))
-        >>> g.ids() == {(1, (53.3, -118)), (2, (55, -120)), (3, (52, -119))}
-        True
-        >>> g.vertices() == {(53.3,-118), (55,-120), (52,-119)}
-        False
+        >>> g.coordinates()
+        [(1, (53.3, -118)), (2, (55, -120)), (3, (52, -119))]
         """
-        return set(self._id_index.items())
+        
+        coords = []
+        for v_id,data in self._map_data.items():
+            coords.append((v_id, data[0]))
+    
+        return coords
 
     def is_vertex(self, v):
         """
-        Returns true if and only if v is a vertex in the graph. v should be a 
-        tuple: (lat, long), or its ID if there is one (slower).
+        Returns true if and only if v is a vertex in the graph.
+        This is more efficient then checking v in g.vertices().
+
+        Running time: O(1)
 
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.is_vertex(1)
         True
         >>> g.is_vertex(4)
         False
-        >>> g.add_vertex((55, -150))
-        >>> g.is_vertex((55, -150))
-        True
-        >>> g.is_vertex((150, -200))
-        False
         """
-        if type(v) is int: v = self.id_to_coord(v)
 
         return v in self._map_data.keys()
 
     def is_edge(self, e):
         """
-        Returns true if and only if e is an edge in the graph. e should be a 
-        tuple: ((start_lat, start_lon), (end_lat, end_lon)), or (v_id1, v_id2)
-        if IDs exist for those vertices (or a combination of IDs and coordinates)
+        Returns true if and only if e is an edge in the graph.
         
+        Running time: O(len(self._map_data[e[0]]))
+        linear in the number neighbours of e[0]
+
         >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.is_edge((1,2))
         True
@@ -340,20 +220,11 @@ class Graph:
         False
         >>> g.is_edge((3,1))
         False
-        >>> g.is_edge((1,(55,-120)))
-        True
-        >>> g.is_edge(((53.3,-118), (52,-119)))
-        False
         """
-        start = e[0]
-        end = e[1]
-        
-        if type(e[0]) is int: start = self.id_to_coord(e[0])
-        if type(e[1]) is int: end = self.id_to_coord(e[1])
-        
-        if not self.is_vertex(start):
+
+        if not self.is_vertex(e[0]):
             return False
-        return end in self._map_data[start][0]
+        return e[1] in self._map_data[e[0]][1]
 
 def is_walk(g, walk):
     """
@@ -424,16 +295,15 @@ def breadth_first_search(g,start):
     
     >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-125,4), (54,-130,5), (51,-115,6)}, [(1,2), (1,3), (2,5), (3,2), (4,3), (4,5), (4,6), (5,2), (5,6)])
     >>> reached = breadth_first_search(g, 1)
-    >>> reached.keys() == {(53.3,-118),(55,-120),(52,-119),(54,-130),(51,-115)}
+    >>> reached.keys() == {1,2,3,5,6}
     True
-    >>> g.is_edge((reached[(51,-115)], (51,-115)))
+    >>> g.is_edge((reached[6], 6))
     True
     >>> g = Graph({(52.5,-119,1),(53,-120,2),(51,-122,3)}, [(1,2), (3,2)])
-    >>> reached = breadth_first_search(g, (53,-120))
-    >>> reached.keys() == {g.id_to_coord(2)}
+    >>> reached = breadth_first_search(g, 2)
+    >>> reached.keys() == {2}
     True
     """
-    if type(start) is int: start = g.id_to_coord(start) 
     
     reached = {}
 
@@ -468,17 +338,16 @@ def depth_first_search(g,start):
 
     This will give shortest path    
     >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-125,4), (54,-130,5), (51,-115,6)}, [(1,2), (1,3), (2,5), (3,2), (4,3), (4,5), (4,6), (5,2), (5,6)])
-    >>> reached = breadth_first_search(g, 1)
-    >>> reached.keys() == {(53.3,-118),(55,-120),(52,-119),(54,-130),(51,-115)}
+    >>> reached = depth_first_search(g, 1)
+    >>> reached.keys() == {1,2,3,5,6}
     True
-    >>> g.is_edge((reached[(51,-115)], (51,-115)))
+    >>> g.is_edge((reached[6], 6))
     True
     >>> g = Graph({(52.5,-119,1),(53,-120,2),(51,-122,3)}, [(1,2), (3,2)])
-    >>> reached = breadth_first_search(g, (53,-120))
-    >>> reached.keys() == {g.id_to_coord(2)}
+    >>> reached = depth_first_search(g, 2)
+    >>> reached.keys() == {2}
     True
     """
-    if type(start) is int: start = g.id_to_coord(start)
     
     # This gives a shortest path because if a node is found at a depth,
     # it was not there in the 1 lower level of depth. 
@@ -572,12 +441,11 @@ def load_data(filename):
     f = open(filename, 'r')
     print("Map data CSV file successfully opened! Converting to graph...\n")
     
-    
     for i,l in enumerate(f): pass # Source: http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
     file_len = 2*(i + 1)
     f.seek(0)
     
-    print("Progress: |" + 99*" " + "|   0 %%", end = "") # Progress bar
+    print("Progress: |" + 100*" " + "|   0 %%", end = "") # Progress bar
     last_per = 0
     
     attempt = 1
@@ -595,7 +463,7 @@ def load_data(filename):
         if line_number == file_len/2:
             f.seek(0)
             attempt = 2
-         
+            
         # Progress bar printer
         new_per = (line_number*100//file_len)
         if new_per - last_per >= 1:
@@ -603,10 +471,9 @@ def load_data(filename):
         last_per = new_per
     
     print("\n")
-    
     f.close() 
     
-    print("Data loaded. Total successful lines = %d. Number of errored lines = %d" %(((file_len/2)-len(errored_lines)), len(errored_lines)))
+    print("Data loaded. Number of errors = %d" % len(errored_lines))
 
     if len(errored_lines) != 0: 
         print("Errored lines: " + str(errored_lines))
