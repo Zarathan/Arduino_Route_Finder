@@ -1,11 +1,13 @@
 """
 Graph module for directed graph.
 
-This module follows the same philosophy as the module designed in class, but
-it is implemented specifically for map data.
-
-All running time statements are under the assumption that it takes
-O(1) time to index a dictionary.
+The data is stored as a dict where the keys are the IDs of the vertices.
+The value of each key is a list consisting of 1 tuple and 1 list:
+    => The tuple contains the coordinate information: (latitude, longitude).
+       Tuple is being used because updating the coordinates should theoretically
+       be a rare task. Immutable object is thus better.
+    => The list contains the IDs of all the neighbours of that vertex.
+       List is being used as neighbours could need updating as the map progresses.
 """
 
 from collections import deque
@@ -14,36 +16,30 @@ class Graph:
 
     def __init__(self, V=set(), E=[]):
         """
-        Create a graph with a given set of
-        vertices and list of edges.
-        For the purpose of this class
-        We want E to be a list of tuples of the 2 vertex IDs.
+        Create a graph with a given set of vertices and list of edges.
+        E is a list of tuples of the 2 vertex IDs of the form (start, end).
         V is set of tuples, where each tuple is of the format
-        (Vertex ID, Latitude, Longitude) of 1 vertex.
+        (Latitude, Longitude, Vertex ID) of 1 vertex.
         
-        If no arguements are passed in,
-        the graph is an empty graph with
+        If no arguements are passed in, the graph is an empty graph with
         no vertices and edges.
 
-        Running time: O(len(V) + len(E))
-
         >>> g = Graph()
-        >>> g._alist == {}
+        >>> g._map_data == {}
         True
-        >>> g = Graph({(1,53.3,-118), (2,55,-120), (3,52,-119)}, {(1,2), (2,3)})
-        >>> g._alist.keys() == set({(1,53.3,-118), (2,55,-120), (3,52,-119)})
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
+        >>> g._map_data.keys() == set({1,2,3})
         True
-        >>> g._alist[(1,53.3,-118)]
-        [(2, 55, -120)]
-        >>> g._alist[3]
-        []
+        >>> g._map_data[1]
+        [(53.3, -118), [2]]
+        >>> g._map_data[3]
+        [(52, -119), []]
+        >>> g._map_data[2]
+        [(55, -120), [3]]
         """
 
-        # _alist is a dictionary that maps vertices to a list of vertices
-        # i.e. _alist[v] is the list of neighbours of v
-        # This also means _alist.keys() is the set of nodes in the graph
-        self._alist = {}
-
+        self._map_data = {}
+        
         for v in V:
             self.add_vertex(v)
 
@@ -54,7 +50,7 @@ class Graph:
         """
         Returns a tuple of the form (latitude, longitude) of the given v_id (vertex id).
         
-        >>> g = Graph({(1,53.3,-118), (2,55,-120), (3,52,-119)}, {(1,2), (2,3)})
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.id_to_coord(1)
         (53.3, -118)
         >>> g.id_to_coord(3)
@@ -62,7 +58,25 @@ class Graph:
         >>> g.id_to_coord(6)
         ()
         """
+        if v_id not in self._map_data.keys(): return ()
+        else: return self._map_data[v_id][0] # Can directly return without any risk becuase tuple is immutable
         
+    def coord_to_id(self, coord):
+        """
+        Returns the ID of the passed coordinates of a vertex as a tuple: (latitude, longitude)
+        Useful only if you know the precise coordinates as stored in the graph.
+        
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
+        >>> g.coord_to_id((53.3, -118))
+        1
+        >>> g.coord_to_id((52, -119))
+        3
+        >>> g.coord_to_id((89, 82))
+        """
+        for v_id in self._map_data.keys():
+            if self._map_data[v_id][0] == coord: return v_id
+        
+        return None 
         
     def add_vertex(self, v):
         """
@@ -72,41 +86,42 @@ class Graph:
         Running time: O(1)
         
         >>> g = Graph()
-        >>> g.add_vertex((1,52,-118))
-        >>> (1,52,-118) in g._alist.keys()
+        >>> g.add_vertex((52,-118,1))
+        >>> 1 in g._map_data.keys()
         True
-        >>> g.add_vertex((1,55,-120))
-        >>> len(g._alist) == 1
+        >>> g._map_data[1]
+        [(52, -118), []]
+        >>> g.add_vertex((55,-120,1))
+        >>> len(g._map_data) == 1
         True
-        >>> (1,52,-118) in g._alist.keys()
-        False
-        >>> (1,55,-120) in g._alist.keys()
-        True
+        >>> g._map_data[1]
+        [(55, -120), []]
         """
-        if v[0] not in self._alist.keys():
-            self._alist[v] = []
+        if v[2] not in self._map_data.keys():
+            self._map_data[v[2]] = [(v[0], v[1]), []]
 
+        else: self._map_data[v[2]][0] = (v[0], v[1])
+        
     def add_edge(self, e):
         """
-        Adds an edge to our graph.
-        Do not add edge if the vertices
-        for it do not exist. 
+        Adds an edge to our graph. The edge should be of the form: (v_id1, v_id2),
+        where v_id1 and v_id2 should be the IDs of 2 vertices already in graph.
         Can add more than one copy of an edge.
 
         Running time: O(1)
 
-        >>> g = Graph({1,2})
-        >>> 2 in g._alist[1]
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)})
+        >>> 2 in g._map_data[1][1]
         False
         >>> g.add_edge((1,2))
-        >>> 2 in g._alist[1]
+        >>> 2 in g._map_data[1][1]
         True
         >>> g.add_edge((1,2))
-        >>> len(g._alist[1]) == 2
+        >>> len(g._map_data[1][1]) == 2
         True
         """
-        if e[0] in self._alist.keys() and e[1] in self._alist.keys():
-            self._alist[e[0]].append(e[1])
+        if e[0] in self._map_data.keys() and e[1] in self._map_data.keys():
+            self._map_data[e[0]][1].append(e[1])
 
     def neighbours(self,v):
         """
@@ -115,19 +130,18 @@ class Graph:
         
         >>> g = Graph()
         >>> g.neighbours(1)
-        []
-        >>> g = Graph({1,2,3}, [(1,2), (1,3)])
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3), (1,3)])
         >>> g.neighbours(1)
         [2, 3]
 
-        Running time: O(len(self._alist[v]))
+        Running time: O(len(self._map_data[v]))
         (linear in the number of neighbours of v)
         """
 
-        if v not in self._alist.keys():
-            return []
+        if v not in self._map_data.keys():
+            return None 
         else:
-            return list(self._alist[v]) 
+            return list(self._map_data[v][1]) 
 
     def vertices(self):
         """
@@ -135,12 +149,12 @@ class Graph:
 
         Running time: O(# vertices)
 
-        >>> g = Graph({1,2,3}, [(1,2), (2,3)])
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.vertices() == {1,2,3}
         True
         """
 
-        return set(self._alist.keys())
+        return set(self._map_data.keys())
 
     def edges(self):
         """
@@ -148,17 +162,32 @@ class Graph:
 
         Running time: O(# nodes + # edges)
 
-        >>> g = Graph({1,2,3}, [(1,2), (2,3)])
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.edges()
         [(1, 2), (2, 3)]
         """
         
         edges = []
-        for v,adj in self._alist.items():
-            for u in adj:
-                edges.append((v,u))
+        for v_id,data in self._map_data.items():
+            for u in data[1]:
+                edges.append((v_id,u))
     
         return edges
+
+    def coordinates(self):
+        """
+        Returns a copy of all the vertices & their coordinates in the graph.
+        
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
+        >>> g.coordinates()
+        [(1, (53.3, -118)), (2, (55, -120)), (3, (52, -119))]
+        """
+        
+        coords = []
+        for v_id,data in self._map_data.items():
+            coords.append((v_id, data[0]))
+    
+        return coords
 
     def is_vertex(self, v):
         """
@@ -167,23 +196,23 @@ class Graph:
 
         Running time: O(1)
 
-        >>> g = Graph({1,2})
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.is_vertex(1)
         True
-        >>> g.is_vertex(3)
+        >>> g.is_vertex(4)
         False
         """
 
-        return v in self._alist.keys()
+        return v in self._map_data.keys()
 
     def is_edge(self, e):
         """
         Returns true if and only if e is an edge in the graph.
         
-        Running time: O(len(self._alist[e[0]]))
+        Running time: O(len(self._map_data[e[0]]))
         linear in the number neighbours of e[0]
 
-        >>> g = Graph({1,2}, [(1,2)])
+        >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3)}, [(1,2), (2,3)])
         >>> g.is_edge((1,2))
         True
         >>> g.is_edge((2,1))
@@ -194,7 +223,7 @@ class Graph:
 
         if not self.is_vertex(e[0]):
             return False
-        return e[1] in self._alist[e[0]]
+        return e[1] in self._map_data[e[0]][1]
 
 def is_walk(g, walk):
     """
@@ -206,7 +235,7 @@ def is_walk(g, walk):
       - d = maximum size of a neighbourhood of a node
     In particular, if the graph has no repeated edges, then d <= # nodes.
     
-    >>> g = Graph({1,2,3,4}, [(1,2), (2,3), (2,4), (4,3), (3,1)])
+    >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-125,4)}, [(1,2), (2,3), (3,1), (2,4)])
     >>> is_walk(g, [1,2,3,1,2,4])
     True
     >>> is_walk(g, [1,2,3,2])
@@ -242,7 +271,7 @@ def is_path(g, path):
     Running time: O(k*d)
     Specifically, is O(k) + running time of is_walk.
 
-    >>> g = Graph({1,2,3,4}, [(1,2), (2,3), (2,4), (4,3), (3,1)])
+    >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-125,4)}, [(1,2), (2,3), (3,1), (2,4)])
     >>> is_path(g, [1,2,3,1,2,4])
     False
     >>> is_path(g, [1,2,3])
@@ -263,13 +292,13 @@ def breadth_first_search(g,start):
     
     This will give a longer path than depth_first_search
     
-    >>> g = Graph({1,2,3,3,4,5,6}, [(1,2), (1,3), (2,5), (3,2), (4,3), (4,5), (4,6), (5,2), (5,6)])
+    >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-125,4), (54,-130,5), (51,-115,6)}, [(1,2), (1,3), (2,5), (3,2), (4,3), (4,5), (4,6), (5,2), (5,6)])
     >>> reached = breadth_first_search(g, 1)
     >>> reached.keys() == {1,2,3,5,6}
     True
     >>> g.is_edge((reached[6], 6))
     True
-    >>> g = Graph({1,2,3}, [(1,2), (3,2)])
+    >>> g = Graph({(52.5,-119,1),(53,-120,2),(51,-122,3)}, [(1,2), (3,2)])
     >>> reached = breadth_first_search(g, 2)
     >>> reached.keys() == {2}
     True
@@ -307,13 +336,13 @@ def depth_first_search(g,start):
     More specifically, O(# edges (u,w) with u reachable from start)
 
     This will give shortest path    
-    >>> g = Graph({1,2,3,3,4,5,6}, [(1,2), (1,3), (2,5), (3,2), (4,3), (4,5), (4,6), (5,2), (5,6)])
+    >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-125,4), (54,-130,5), (51,-115,6)}, [(1,2), (1,3), (2,5), (3,2), (4,3), (4,5), (4,6), (5,2), (5,6)])
     >>> reached = depth_first_search(g, 1)
     >>> reached.keys() == {1,2,3,5,6}
     True
     >>> g.is_edge((reached[6], 6))
     True
-    >>> g = Graph({1,2,3}, [(1,2), (3,2)])
+    >>> g = Graph({(52.5,-119,1),(53,-120,2),(51,-122,3)}, [(1,2), (3,2)])
     >>> reached = depth_first_search(g, 2)
     >>> reached.keys() == {2}
     True
@@ -357,7 +386,7 @@ def count_components(g):
     
     Runtime: O(# of nodes + # of edges)
     
-    >>> g = Graph({1,2,3,4,5,6}, [(1,2), (2,1), (3,4), (4,3), (3,5), (5,3), (4,5), (5,4)])
+    >>> g = Graph({(53.3,-118,1), (55,-120,2), (52,-119,3), (59,-125,4), (54,-130,5), (51,-115,6)}, [(1,2), (2,1), (3,4), (4,3), (3,5), (5,3), (4,5), (5,4)])
     >>> count_components(g)
     3
     >>> g.add_edge((1,4))
@@ -397,13 +426,11 @@ def load_data(filename):
     Make sure that 'filename' exists. Program will break if it is not found.
     
     Data syntax for V:
-    V, <Vertex ID>, <Latitude>, <Longitude>
+    V,<Vertex ID>,<Latitude>,<Longitude>
     
     Data syntax for E:
-    E, <Vertex ID start>, <Vertex ID end> <Edge name>
+    E,<Vertex ID start>,<Vertex ID end>,< Optional Edge name>
     
-    >>>
-    >>>
     """
     print("Loading data...\n")
     line_number = 0
@@ -417,34 +444,36 @@ def load_data(filename):
     file_len = i + 1
     f.seek(0)
     
-    print("Progress: |" + 100*" " + "| 0 %", end = "") # Progress bar
+    print("Progress: |" + 100*" " + "|   0 %%", end = "") # Progress bar
     last_per = 0
     
     for line in f:
         line_number += 1
-        data = line.strip()
+        data = line.split(sep=",")
                 
-        if data[0] = 'V': # Vertex
-            g.add_vertex(data[1], data[2], data[3])
-        elif data[0] = 'E': # Edge
-            g.add_edge((data[1], data[2]))
+        if data[0] == 'V': # Vertex
+            g.add_vertex((float(data[2]), float(data[3]), int(data[1])))
+        elif data[0] == 'E': # Edge
+            g.add_edge((int(data[1]), int(data[2])))
         else: # Incorrect data type
             errored_lines.append(line_number)
         
         # Following is the progress bar printer
-        if int((line_number/file_len)*100 - last_per) >= 1: 
-           new_per = (line_number*100//file_len)
-           print((105-last_per)*"\u0008" + (new_per-last_per)*"*" + (100-new_per)*" " + "| " + str(new_per) + "%", end="")
-           last_per = new_per
+        # if int((line_number/file_len)*100 - last_per) >= 1: 
+         
+        new_per = (line_number*100//file_len)
+        if new_per - last_per >= 1:
+            print((107-last_per)*"\u0008" + (new_per-last_per)*"*" + (100-new_per)*" " + "| %3.0f %%" %new_per, end="")
+        last_per = new_per
     
     print("\n")
     f.close() 
     
-    print("Data loaded. Number of errors = " + len(errored_lines))
+    print("Data loaded. Number of errors = %d" % len(errored_lines))
 
     if len(errored_lines) != 0: 
         print("Errored lines: " + errored_lines)
-        print("All the recognised lines have been loaded.
+        print("All the recognised lines have been loaded.")
         
         while(1):
             decision = input("Do you want to edit the file " + filename + " and try loading data again? (Y/N)")
