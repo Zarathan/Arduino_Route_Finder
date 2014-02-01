@@ -441,26 +441,29 @@ def load_data(filename):
     print("Map data CSV file successfully opened! Converting to graph...\n")
     
     for i,l in enumerate(f): pass # Source: http://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-    file_len = i + 1
+    file_len = 2*(i + 1)
     f.seek(0)
     
     print("Progress: |" + 100*" " + "|   0 %%", end = "") # Progress bar
     last_per = 0
     
+    attempt = 1
     for line in f:
         line_number += 1
         data = line.split(sep=",")
                 
         if data[0] == 'V': # Vertex
-            g.add_vertex((float(data[2]), float(data[3]), int(data[1])))
+            if attempt == 1: g.add_vertex((float(data[2]), float(data[3]), int(data[1])))
         elif data[0] == 'E': # Edge
-            g.add_edge((int(data[1]), int(data[2])))
+            if attempt == 2: g.add_edge((int(data[1]), int(data[2])))
         else: # Incorrect data type
-            errored_lines.append(line_number)
+            if attempt == 1: errored_lines.append(line_number)
         
-        # Following is the progress bar printer
-        # if int((line_number/file_len)*100 - last_per) >= 1: 
-         
+        if line_number == file_len/2:
+            f.seek(0)
+            attempt = 2
+            
+        # Progress bar printer
         new_per = (line_number*100//file_len)
         if new_per - last_per >= 1:
             print((107-last_per)*"\u0008" + (new_per-last_per)*"*" + (100-new_per)*" " + "| %3.0f %%" %new_per, end="")
@@ -472,7 +475,7 @@ def load_data(filename):
     print("Data loaded. Number of errors = %d" % len(errored_lines))
 
     if len(errored_lines) != 0: 
-        print("Errored lines: " + errored_lines)
+        print("Errored lines: " + str(errored_lines))
         print("All the recognised lines have been loaded.")
         
         while(1):
