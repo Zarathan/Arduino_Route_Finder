@@ -9,7 +9,7 @@ This repository is to be used only by the users as a means of version control
 for developing the code for "Assignment 3" of the CMPUT 275 course at the U of A.
 Let this be a disclaimer that any academic integrity related consequences arising
 from the infringement of this copyright shall not be the responsibility of the owners.
-If the U of A considers some potential act as an infringement of their policies, 
+If the U of A considers some potential act by a visitor as an infringement of their policies, 
 only the visitors shall bear the consequences as they were duly warned.
 
 The owners are not using this repository as a means of distributing their code
@@ -20,3 +20,5 @@ preventive measure is being followed in the case of "lucky discovery" over
 the internet. 
 
 Dated: 31 January, 2014
+
+
