@@ -37,4 +37,4 @@ def least_cost_path(G, start, dest, cost):
         component.pop(cheapest) # delete the node from component
         cheapest = min(costs, key=costs.get) # find the NEW cheapest node.....this will search
                                              # through all of the nodes in "costs" and find the
-                                             # one with least cost.
+                                             # one with least cost
