@@ -1,0 +1,20 @@
+-in graph.py:
+    the test cases are using breadth_first_search in depth_first_search!
+    
+    -NEIGHOBURS MUST WORK FOR DIRECTED GRAPHS
+    
+    -return the server value x100000?
+    
+    
+    
+    
+    
+Tests for server.py:
+
+Point 1: 313947523
+53.573468
+-113.398320
+
+Point 2: 313946871
+53.573470
+-113.396800
