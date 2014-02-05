@@ -1,8 +1,8 @@
 from graph import *
-from cost import *
+from network import *
 
 
-edmonton_graph = load_data("edmonton-roads-2.0.1.txt")
+edmonton_network = load_data("edmonton-roads-2.0.1.txt")
 
 start_lat = input("Please enter the latitude of the starting point.\n")
 start_lon = input("Please enter the longitude of the starting point.\n")
