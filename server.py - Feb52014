@@ -1,0 +1,116 @@
+from graph import *
+from cost import *
+
+edmonton_maps = load_data("edmonton-roads-2.0.1.txt")
+
+start_lat = input("\n\nPlease enter the latitude of the starting point.\n")
+start_lon = input("Please enter the longitude of the starting point.\n")
+end_lat = input("Please enter the latitude of the destination point.\n")
+end_lon = input("Please enter the longitude of the destination point.\n")
+
+start_lat = round(float(start_lat) / 100000, 6)
+start_lon = round(float(start_lon) / 100000, 6)
+end_lat = round(float(end_lat) / 100000, 6)
+end_lon = round(float(end_lon) / 100000, 6)
+
+start = (start_lat, start_lon)
+dest = (end_lat, end_lon)
+
+
+def least_cost_path(G, start, dest, cost):
+    """
+    Returns the shortest (cheapest) path from the starting node to destination node, given
+    a graph G and a cost function. Prints the length of the shortest path and each 
+    coordinate (multiplied by a factor of 100,000).
+    
+    If the destination cannot be reached from the starting node, return None.
+    If the starting and destination nodes are equal, return [start].
+    
+    In terms of running time, let V represent the total number of vertices (nodes) 
+    in the graph, and E represent the total number of edges in the graph.
+    
+    Examples:
+    
+    >>> g = Graph({(1, 2), (2, 3), (3, 4), (4, 5)}, [((1, 2), (2, 3)), ((2, 3), (3, 4)), ((2, 3), (4, 5)), ((1, 2), (3, 4)), ((3, 4), (4, 5))])
+    """
+    
+    
+    if start == dest:
+        return [start]
+        
+        
+    # Declaration of variables. "visited_costs" contains every node that has been visited as keys,
+    # and their associated costs as values. "previous" contains nodes as keys and their preceeding
+    # node as a value. "shortest_path" is a list containing the shortest path from start to dest.
+    # "current" is temporarily used while finding that path.
+    visited_costs = dict()
+    previous = dict()
+    shortest_path = []
+    current = None    
+        
+        
+    # Find the component associated with "start". This component will be used in
+    # Dijkstra's algorithm instead of using the entire graph.
+    # Running time of depth_first_search: O(V + E)
+    component = depth_first_search(G, start)    
+
+    
+    # If the destination is not connected to the start, exit.
+    if dest not in component:
+        return None
+    
+    
+    # Assign the cost of each node (in the component) to infinity.
+    # Assign the starting cost to be 0.
+    # Running time: O(V)
+    costs = {node:float("inf") for node in component.keys()}
+    costs[start] = 0
+    visited_costs[start] = 0
+    cheapest = start
+    
+    
+    # Dijkstra's Algorithm: Overall running time: O(V^2 + E)
+    # Running time of while-loop: O(# nodes in component of start) = O(V)
+    while component:
+    
+        # Find the neighbours of the current node.
+        # Running time: O(# neighbours of node)
+        adjacents = G.neighbours(cheapest)
+        
+        # Update the cost of each neighbour. A neighbour is only updated if the calculated
+        # cost is less than the previously assigned cost.
+        for node in adjacents:
+            if costs[node] > cost((cheapest, node)) + costs[cheapest]:
+                costs[node] = cost((cheapest, node)) + costs[cheapest]
+                visited_costs[node] = costs[node]
+                previous[node] = cheapest
+                    
+        # Remove the current node from the component and from costs (to avoid
+        # repeated computations).
+        component.pop(cheapest)
+        visited_costs.pop(cheapest)
+        
+        # Find the (new) minimum-cost node in the graph; it will be the new "current node".
+        cheapest = min(visited_costs, key=visited_costs.get)
+
+        # If the destination has been reached, traverse backwards along the
+        # shortest path until you have reached start, and return this path.
+        # Running time: O(# of nodes in the shortest path)
+        if cheapest == dest:
+            current = cheapest
+            while current != start:
+                shortest_path.append(current)
+                current = previous[current]
+            shortest_path.append(start)
+            shortest_path.reverse()
+            print(len(shortest_path))
+            for node in shortest_path:
+                print(int(node[0]*100000), int(node[1]*100000))
+            return shortest_path
+
+    return None
+    
+    
+path = least_cost_path(edmonton_maps, start, dest, cost_distance)
+    
+       
